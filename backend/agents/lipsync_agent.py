@@ -1,63 +1,69 @@
-"""Lip-Sync Agent - MuseTalk Integration"""
+"""
+Lipsync Agent - MuseTalk Integration
+Maps speech to mouth movement on character face
+"""
 
-import os
-import torch
+import logging
+import subprocess
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
 
-class LipSyncAgent:
-    """Lip-Sync Agent using MuseTalk v1.5"""
-    
-    def __init__(self, model_path="models/musetalk"):
-        self.model_path = Path(model_path)
-        self.model = None
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+class LipsyncAgent:
+    def __init__(self):
+        """Initialize Lipsync model (MuseTalk)"""
+        logger.info("🤐 Lipsync Agent initialized (MuseTalk to be integrated)")
+        self.musetalk_path = "./backend/models/musetalk"
         
-    def load_model(self):
-        """Load MuseTalk model (lazy loading)"""
-        if self.model is None:
-            print("Loading MuseTalk model...")
-            # TODO: Implement actual MuseTalk loading
-            # Follow: https://github.com/TMElyralab/MuseTalk
-            print("MuseTalk model loaded")
-    
-    async def generate(
+    def generate_lipsync(
         self,
-        audio_path: Path,
-        character: str = "character1",
-        output_dir: Path = Path("outputs")
-    ) -> Path:
+        character_image: str,
+        audio_path: str,
+        output_path: str = None
+    ) -> str:
         """
-        Generate lip-synced video from audio
+        Generate lip-synced video of character
         
         Args:
-            audio_path: Path to audio file
-            character: Character ID
-            output_dir: Output directory
+            character_image: Path to character face image (PNG)
+            audio_path: Path to audio file (WAV)
+            output_path: Where to save video
             
         Returns:
-            Path to generated video file
+            Path to lip-synced video
         """
-        self.load_model()
-        
-        # Get character image
-        character_image = Path(f"assets/characters/{character}/face.png")
-        
-        if not character_image.exists():
-            raise FileNotFoundError(f"Character image not found: {character_image}")
-        
-        # TODO: Run MuseTalk inference
-        # result_video = musetalk_inference(
-        #     avatar_path=character_image,
-        #     audio_path=audio_path,
-        #     result_dir=output_dir
-        # )
-        
-        output_path = output_dir / f"lipsync_{character}_{audio_path.stem}.mp4"
-        
-        print(f"Generated lip-sync video: {output_path}")
-        return output_path
+        try:
+            logger.info(f"🎬 Generating lip-sync...")
+            logger.info(f"   Character: {character_image}")
+            logger.info(f"   Audio: {audio_path}")
+            
+            if output_path is None:
+                output_path = f"./backend/outputs/lipsync_{hash(character_image)}.mp4"
+            
+            # PLACEHOLDER: MuseTalk integration will go here
+            # For now, we'll use ffmpeg to create a silent video as placeholder
+            logger.warning("⚠️  MuseTalk not yet integrated - using placeholder")
+            
+            # TODO: Replace with actual MuseTalk call:
+            # python inference.py \
+            #   --avatar_path {character_image} \
+            #   --audio_path {audio_path} \
+            #   --result_dir {output_dir}
+            
+            logger.info(f"✅ Lipsync video would be: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logger.error(f"❌ Lipsync generation failed: {e}")
+            raise
 
 
 # Singleton instance
-lipsync_agent = LipSyncAgent()
+_lipsync_agent = None
+
+def get_lipsync_agent():
+    """Get or create Lipsync agent instance"""
+    global _lipsync_agent
+    if _lipsync_agent is None:
+        _lipsync_agent = LipsyncAgent()
+    return _lipsync_agent

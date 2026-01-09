@@ -1,85 +1,120 @@
-"""TTS Agent - Indic-Parler TTS Integration"""
+"""
+TTS Agent - Indic-Parler TTS Integration
+Converts Hindi/English text to natural speech
+"""
 
-import os
 import torch
 import soundfile as sf
+from transformers import AutoTokenizer, AutoModel
 from pathlib import Path
+import logging
+from config import TTS_MODEL_NAME
 
+logger = logging.getLogger(__name__)
 
 class TTSAgent:
-    """Text-to-Speech Agent using Indic-Parler TTS"""
-    
-    def __init__(self, model_name="ai4bharat/indic-parler-tts"):
-        self.model_name = model_name
-        self.model = None
-        self.tokenizer = None
+    def __init__(self):
+        """Initialize TTS model"""
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"🎤 Loading TTS model on {self.device}")
         
-    def load_model(self):
-        """Load TTS model (lazy loading)"""
-        if self.model is None:
-            print(f"Loading TTS model: {self.model_name}")
-            # TODO: Implement actual model loading
-            # from transformers import AutoTokenizer, AutoModel
-            # self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            # self.model = AutoModel.from_pretrained(self.model_name)
-            # self.model.to(self.device)
-            print("TTS model loaded")
-    
-    async def generate(
-        self,
-        text: str,
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(TTS_MODEL_NAME)
+            self.model = AutoModel.from_pretrained(TTS_MODEL_NAME)
+            self.model.to(self.device)
+            self.model.eval()
+            logger.info("✅ TTS Model loaded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to load TTS model: {e}")
+            raise
+
+        # Voice presets
+        self.voices = {
+            "male_young": "A male speaker with youthful voice",
+            "male_adult": "A male speaker with mature voice",
+            "female_young": "A female speaker with youthful voice",
+            "female_adult": "A female speaker with mature voice",
+            "male_kids": "A male speaker speaking to children",
+        }
+
+        # Emotion descriptions
+        self.emotions = {
+            "neutral": "speaking in a neutral tone",
+            "happy": "speaking in a happy, cheerful tone",
+            "sad": "speaking in a sad, melancholic tone",
+            "excited": "speaking with excitement and enthusiasm",
+            "angry": "speaking in an angry tone",
+            "scared": "speaking in a frightened tone",
+        }
+
+    def generate_speech(
+        self, 
+        text: str, 
+        voice: str = "male_adult", 
         emotion: str = "neutral",
-        voice: str = "male_young",
-        speed: float = 1.0,
-        output_dir: Path = Path("outputs")
-    ) -> Path:
+        output_path: str = None
+    ) -> str:
         """
         Generate speech from text
         
         Args:
             text: Input text (Hindi/English)
-            emotion: Emotion style (happy, sad, neutral, excited)
             voice: Voice preset
-            speed: Speech speed multiplier
-            output_dir: Output directory
+            emotion: Emotion modifier
+            output_path: Where to save audio
             
         Returns:
             Path to generated audio file
         """
-        self.load_model()
-        
-        # Build description for Parler-TTS
-        emotion_map = {
-            "happy": "cheerful and energetic",
-            "sad": "melancholic and slow",
-            "neutral": "clear and natural",
-            "excited": "enthusiastic and fast-paced"
-        }
-        
-        voice_map = {
-            "male_young": "A young male speaker",
-            "male_mature": "A mature male speaker",
-            "female_young": "A young female speaker",
-            "female_mature": "A mature female speaker"
-        }
-        
-        description = f"{voice_map.get(voice, 'A speaker')} with {emotion_map.get(emotion, 'neutral')} tone"
-        
-        # TODO: Actual TTS generation
-        # inputs = self.tokenizer(description, text, return_tensors="pt").to(self.device)
-        # with torch.no_grad():
-        #     audio = self.model.generate(**inputs)
-        
-        # For now, create placeholder
-        output_path = output_dir / f"audio_{hash(text)}.wav"
-        
-        # TODO: Save actual audio
-        # sf.write(output_path, audio.cpu().numpy().squeeze(), 24000)
-        
-        print(f"Generated audio: {output_path}")
-        return output_path
+        try:
+            # Build description
+            voice_desc = self.voices.get(voice, self.voices["male_adult"])
+            emotion_desc = self.emotions.get(emotion, self.emotions["neutral"])
+            description = f"{voice_desc}, {emotion_desc}"
+
+            logger.info(f"🎵 Generating speech: {text[:50]}...")
+            logger.info(f"   Voice: {voice}, Emotion: {emotion}")
+
+            # Tokenize
+            inputs = self.tokenizer(description, text, return_tensors="pt")
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+            # Generate audio
+            with torch.no_grad():
+                audio = self.model.generate(**inputs)
+
+            # Extract audio tensor
+            audio_numpy = audio.cpu().numpy().squeeze()
+
+            # Save audio
+            if output_path is None:
+                output_path = f"./backend/outputs/audio_{hash(text)}.wav"
+            
+            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+            sf.write(output_path, audio_numpy, 24000)
+
+            logger.info(f"✅ Audio saved: {output_path}")
+            return output_path
+
+        except Exception as e:
+            logger.error(f"❌ TTS generation failed: {e}")
+            raise
+
+    def get_available_voices(self):
+        """Return available voice options"""
+        return list(self.voices.keys())
+
+    def get_available_emotions(self):
+        """Return available emotion options"""
+        return list(self.emotions.keys())
 
 
 # Singleton instance
-tts_agent = TTSAgent()
+_tts_agent = None
+
+def get_tts_agent():
+    """Get or create TTS agent instance"""
+    global _tts_agent
+    if _tts_agent is None:
+        _tts_agent = TTSAgent()
+    return _tts_agent
