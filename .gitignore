@@ -33,3 +33,5 @@ Thumbs.db
 
 # Dependencies
 node_modules/
+
+backend/backend/outputs/

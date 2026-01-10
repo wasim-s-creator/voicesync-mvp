@@ -88,11 +88,21 @@ async def root():
 async def get_voices():
     """Get available voices"""
     try:
-        tts = get_tts_agent()
-        return {"voices": tts.get_available_voices()}
+        return {
+            "voices": [
+                {"id": "male_deep_hi", "name": "🎤 Deep Male (Hindi)"},
+                {"id": "male_natural_hi", "name": "🎤 Natural Male (Hindi)"},
+                {"id": "female_natural_hi", "name": "👩 Natural Female (Hindi)"},
+                {"id": "male_english_in", "name": "🎤 Male English (India)"},
+                {"id": "female_english_in", "name": "👩 Female English (India)"},
+                {"id": "male_hinglish", "name": "🎙️ Male Hinglish"},
+                {"id": "female_hinglish", "name": "🎙️ Female Hinglish"},
+            ]
+        }
     except Exception as e:
         logger.error(f"Error getting voices: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
 
 @app.get("/api/emotions")
 async def get_emotions():
@@ -201,6 +211,7 @@ async def get_output(file_path: str):
         logger.error(f"Error serving file: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+
 # ============= PROCESSING PIPELINE =============
 
 async def process_video_pipeline(
@@ -222,11 +233,11 @@ async def process_video_pipeline(
         job.progress = 0
 
         tts_agent = get_tts_agent()
-        audio_path = tts_agent.generate_speech(
+        audio_path = await tts_agent.generate_speech(
             text=text,
             voice=voice,
             emotion=emotion,
-            output_path=f"./backend/outputs/{job_id}_audio.wav"
+            output_path=f"./backend/outputs/{job_id}_audio.wav",
         )
         logger.info(f"[{job_id}] ✅ Audio generated: {audio_path}")
         job.progress = 33
