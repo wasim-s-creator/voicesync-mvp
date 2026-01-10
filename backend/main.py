@@ -4,8 +4,9 @@ Main entry point for the API
 """
 
 from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uuid
 import logging
 from pathlib import Path
@@ -67,7 +68,6 @@ class Job:
             "error": self.error
         }
 
-
 # ============= API ENDPOINTS =============
 
 @app.get("/")
@@ -84,7 +84,6 @@ async def root():
         }
     }
 
-
 @app.get("/api/voices")
 async def get_voices():
     """Get available voices"""
@@ -95,7 +94,6 @@ async def get_voices():
         logger.error(f"Error getting voices: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-
 @app.get("/api/emotions")
 async def get_emotions():
     """Get available emotions"""
@@ -105,7 +103,6 @@ async def get_emotions():
     except Exception as e:
         logger.error(f"Error getting emotions: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
-
 
 @app.post("/api/generate")
 async def generate_video(
@@ -156,7 +153,6 @@ async def generate_video(
             content={"error": str(e)}
         )
 
-
 @app.get("/api/status/{job_id}")
 async def get_status(job_id: str):
     """Get job status"""
@@ -169,6 +165,41 @@ async def get_status(job_id: str):
     job = jobs_db[job_id]
     return job.to_dict()
 
+@app.get("/outputs/{file_path:path}")
+async def get_output(file_path: str):
+    """Serve generated output files (audio, video)"""
+    try:
+        file_location = Path("./backend/outputs") / file_path
+        
+        # Security check - prevent path traversal
+        file_location = file_location.resolve()
+        base_path = Path("./backend/outputs").resolve()
+        
+        if not str(file_location).startswith(str(base_path)):
+            return JSONResponse(status_code=403, content={"error": "Access denied"})
+        
+        if file_location.exists():
+            logger.info(f"📥 Serving file: {file_location}")
+            
+            # Determine media type
+            if str(file_location).endswith('.wav'):
+                media_type = "audio/wav"
+            elif str(file_location).endswith('.mp4'):
+                media_type = "video/mp4"
+            else:
+                media_type = "application/octet-stream"
+            
+            return FileResponse(
+                path=file_location,
+                media_type=media_type,
+                filename=file_path.split('/')[-1]
+            )
+        else:
+            logger.warning(f"File not found: {file_location}")
+            return JSONResponse(status_code=404, content={"error": "File not found"})
+    except Exception as e:
+        logger.error(f"Error serving file: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 # ============= PROCESSING PIPELINE =============
 
@@ -241,13 +272,14 @@ async def process_video_pipeline(
         job.status = "failed"
         job.error = str(e)
 
-
 # ============= STARTUP/SHUTDOWN =============
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize models on startup"""
     logger.info("🚀 VoiceSync MVP starting up...")
+    # Create outputs directory if it doesn't exist
+    Path("./backend/outputs").mkdir(parents=True, exist_ok=True)
     try:
         logger.info("📥 Loading TTS Agent...")
         get_tts_agent()
@@ -255,12 +287,10 @@ async def startup_event():
     except Exception as e:
         logger.error(f"❌ Failed to load TTS Agent: {e}")
 
-
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info("🛑 VoiceSync MVP shutting down...")
-
 
 # ============= RUN SERVER =============
 
