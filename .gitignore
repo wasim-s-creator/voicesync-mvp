@@ -1,0 +1,35 @@
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Models & large files
+*.pth
+*.pt
+*.onnx
+backend/models/
+backend/outputs/
+backend/uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+!.env.example
+
+# Dependencies
+node_modules/
